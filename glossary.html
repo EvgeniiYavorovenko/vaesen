@@ -169,14 +169,13 @@ dialog.term-dialog[open]{display:flex;flex-direction:column}
     <header class="reference-heading"><h1 id="reference-title">Довідник термінів</h1><p>Правила, таланти й поняття світу Vaesen. Оберіть термін, щоб прочитати опис, уточнення та пов’язані пояснення.</p></header>
     <div class="reference-filters">
      <div><label for="reference-search">Знайти термін</label><input id="reference-search" type="search" placeholder="Наприклад, головна характеристика" autocomplete="off"><button id="reference-clear" type="button" class="text-button" hidden>Очистити пошук</button></div>
-     <div><label for="reference-category">Розділ</label><select id="reference-category"><option value="players">Усе для гравців · 207</option><option value="terms">Терміни гри · 153</option><option value="talents">Таланти · 54</option><option value="gm">Для майстра · 42</option></select></div>
+     <div><label for="reference-category">Розділ</label><select id="reference-category"><option value="players">Усе для гравців · 207</option><option value="terms">Терміни гри · 153</option><option value="talents">Таланти · 54</option></select></div>
     </div>
-    <p id="reference-gm-note" class="reference-gm-note" hidden>Матеріали майстра: побудова таємниць, магія та властивості істот.</p>
     <div class="reference-list-heading"><p id="reference-count" role="status" aria-live="polite"></p><span id="reference-order" class="small-note">За абеткою · пошук також за синонімами</span></div>
     <ul id="reference-results" class="reference-results"></ul>
     <div id="reference-empty" class="hint-box" hidden><strong>Нічого не знайдено</strong><p>Спробуйте коротшу назву, інше слово або змініть розділ довідника.</p></div>
     <nav id="reference-pagination" class="reference-pagination" aria-label="Сторінки довідника"><button type="button" class="button secondary" data-reference-page="-1">Попередні</button><span id="reference-page-number"></span><button type="button" class="button secondary" data-reference-page="1">Наступні</button></nav>
-    <p class="reference-origin">Об’єднано три довідники проєкту: 153 терміни гри, 54 таланти та 42 статті для майстра. Описи й уточнення переказують українське видання; у кожній статті вказано сторінки книги.</p>
+    <p class="reference-origin">207 статей для гравців: 153 терміни гри та 54 таланти. Описи й уточнення переказують українське видання; у кожній статті вказано сторінки книги.</p>
    </section>
    <article id="reference-article" class="reference-article" hidden></article>
   </main>
@@ -935,7 +934,7 @@ const TERMS=Object.fromEntries(REFERENCE_ENTRIES.map(entry=>[entry.id,{
 const LEGACY_TERM_IDS={attributes:'attribute',skills:'skill',age:'age-group',talents:'talent',roll:'skill-test',pool:'dice-pool',conditions:'condition',physical:'physical-condition',mental:'mental-condition',injury:'critical-injury',dice:'die',dice66:'d66',trauma:'trauma-origin',secret:'dark-secret',relations:'relationship'};
 const FIELD_HELP={appearance:{id:'appearance',title:'Зовнішність і манери',kind:'Порада до поля',definition:STORY.find(x=>x.id==='appearance').hint,clarification:'Опис допомагає уявити героя й сам по собі не додає числових бонусів.',related:[],aliases:[],sources:[],audience:'players'}};
 const resolveTermId=id=>Object.hasOwn(LEGACY_TERM_IDS,id)?LEGACY_TERM_IDS[id]:id;
-const getTerm=id=>{id=resolveTermId(id);return Object.hasOwn(TERMS,id)?TERMS[id]:Object.hasOwn(FIELD_HELP,id)?FIELD_HELP[id]:null;};
+const getTerm=id=>{id=resolveTermId(id);return Object.hasOwn(TERMS,id)?(TERMS[id].audience==='players'?TERMS[id]:null):Object.hasOwn(FIELD_HELP,id)?FIELD_HELP[id]:null;};
 // Populate all rule descriptions in the creator from the same source as tooltips.
 for(const x of [...ATTRS,...SKILLS])x.hint=TERMS[x.id].definition;
 for(const field of STORY){const term=getTerm(field.id);if(term)field.hint=term.definition;}
@@ -1056,8 +1055,9 @@ function referenceRoute(hash,defaultView='builder'){
 }
 function isReferenceView(){return referenceRoute(window.location.hash,document.body.dataset.startView).view==='reference';}
 function referenceResults(query='',category='players'){
+ if(!['players','terms','talents'].includes(category))return [];
  const normalized=normalizeTerm(query),words=normalized.split(' ').filter(Boolean);
- return Object.values(TERMS).filter(t=>category==='gm'?t.audience==='gm':t.audience==='players'&&(category==='talents'?t.section==='talents':category==='terms'?t.section!=='talents':true)).map(term=>{
+ return Object.values(TERMS).filter(t=>t.audience==='players'&&(category==='talents'?t.section==='talents':category==='terms'?t.section!=='talents':true)).map(term=>{
   const name=normalizeTerm(term.title),aliases=term.aliases.map(normalizeTerm),text=normalizeTerm([term.title,...term.aliases,term.definition,term.clarification].join(' '));
   const match=words.every(word=>text.includes(word));
   const rank=!normalized?0:name===normalized?0:aliases.includes(normalized)?1:name.startsWith(normalized)?2:name.includes(normalized)?3:4;
@@ -1076,12 +1076,10 @@ function renderReferenceResults(){
  $('[data-reference-page="-1"]').disabled=referenceState.page===0;
  $('[data-reference-page="1"]').disabled=referenceState.page===pages-1;
  $('#reference-clear').hidden=!referenceState.query;
- $('#reference-gm-note').hidden=referenceState.category!=='gm';
 }
 function renderReferenceArticle(id){
- const term=Object.hasOwn(TERMS,id)?TERMS[id]:null;
+ const term=Object.hasOwn(TERMS,id)&&TERMS[id].audience==='players'?TERMS[id]:null;
  if(!term){$('#reference-article').innerHTML='<a class="reference-back" href="#reference">До всіх термінів</a><h1 id="reference-entry-title" tabindex="-1">Термін не знайдено</h1><p>Оберіть статтю через пошук у довіднику.</p>';return;}
- if(term.audience==='gm')referenceState.category='gm';
  const source=term.section==='talents'?'Довідник талантів':term.audience==='gm'?'Довідник майстра':'Довідник термінів';
  const aliases=REFERENCE_ENTRIES.find(e=>e.id===id).aliases;
  $('#reference-article').innerHTML=`<a class="reference-back" href="#reference">До результатів пошуку</a><header class="reference-article-header"><p class="reference-kind">${esc(term.audience==='gm'?'Для майстра · ':'')}${esc(term.kind)}</p><h1 id="reference-entry-title" tabindex="-1">${esc(term.title)}</h1></header><div class="reference-article-body">${termBodyHTML(term)}</div>${aliases.length?`<p class="reference-aliases"><strong>Також шукати:</strong> ${aliases.map(esc).join('; ')}</p>`:''}${termRelatedHTML(term)}<footer class="reference-source"><strong>${esc(source)} · Geekach 1.02</strong>${term.sources.map(s=>`с. ${s.book_page??'—'} / PDF ${s.pdf_page}`).join(' · ')}<p>Визначення та уточнення зі словника проєкту. Номери «с.» — друковані сторінки книги.</p></footer>`;
